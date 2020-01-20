@@ -58,7 +58,8 @@ def writeIntoDatabase():
     print(text)
 
     #today = time.localtime()
-    today = 'dzisiaj'
+    now = time.localtime()
+    today = time.strftime("%H:%M:%S", now)
 
     print('cardID = ', cardID)
     print('text = ', text)
