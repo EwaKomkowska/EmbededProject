@@ -7,6 +7,7 @@ from mfrc522 import SimpleMFRC522 ## RFID
 import sys
 import time
 import sqlite3
+import random
 
 #dtoverlay=i2c-rtc,ds1307
 #nano /boot/config.txt
@@ -32,9 +33,10 @@ def baza():
 
 
 def openDoor():
-    cardID, text = 1, "text" '''= reader.read()'''
+    #cardID, text = 1, "text"
+    cardID, text = reader.read()
 
-    cur.execute("select * from Cards where id = ?, (cardID, )")
+    cur.execute("select * from Cards where id = ?", (cardID, ))
 
     rows = cur.fetchall()
     for r in rows:
@@ -59,6 +61,7 @@ def writeIntoDatabase(label):
     label.setText('Now place your tag to write')
 
     cardID, text = reader.read()
+    #cardID, text = 1, "text"
     print(cardID)
     
         # if admin
@@ -71,14 +74,22 @@ def writeIntoDatabase(label):
     time.sleep(2.4)
     print('Place your employee')
     cardID, text = reader.read()
+    #cardID, text = 1, "text"
+    text = ''.join(random.sample('abcdefghijk', 10))            #randomowa nazwa uzytkownika
     print(text)
 
     now = time.localtime()
     today = time.strftime("%H:%M:%S", now)
 
-    cur.execute("insert into Cards values(?, ?, ?)", (cardID, text, today))
-    con.commit()
-    print('Written')
+    cur.execute("select * from Cards where id = ?", (cardID, ))
+    rows = cur.fetchall()
+
+    if len(rows) == 0:
+        cur.execute("insert into Cards values(?, ?, ?)", (cardID, text, today))
+        con.commit()
+        print('Written')
+    else:
+        print('You are already in database')
 
 
 class MainWindow(QWidget):
@@ -145,10 +156,10 @@ class MainWindow(QWidget):
                 self.info.setText("New data in database")
                 writeIntoDatabase(self.info)
                 self.timer.singleShot(10000, self.changeLabel)
-                print("Zapisanie do bazy")
+                #print("Zapisanie do bazy")
 
             elif event.key() == Qt.Key_2:
-                #openDoor()
+                #openDoor()         #czy tego już nie można odkomentowac???
                 self.info.setText("The door is open")
                 self.timer.singleShot(10000, self.changeLabel)
                 print("A teraz drzwi")
@@ -173,7 +184,6 @@ class MainWindow(QWidget):
                 self.info.setText("You see all data")
                 self.timer.singleShot(10000, self.changeLabel)
                 print("wyswietlam wszystkie")
-
 
             else:
                 print('Wrong output')
