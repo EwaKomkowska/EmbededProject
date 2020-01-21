@@ -87,8 +87,10 @@ def writeIntoDatabase(label):
     if len(rows) == 0:
         cur.execute("insert into Cards values(?, ?, ?)", (cardID, text, today))
         con.commit()
+        label.setText('Written')
         print('Written')
     else:
+        label.setText('You are already in database')
         print('You are already in database')
 
 
