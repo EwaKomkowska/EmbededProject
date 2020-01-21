@@ -1,9 +1,12 @@
+import RPi.GPIO as GPIO
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from mfrc522 import SimpleMFRC522 ## RFID
+# import SDL_DS3231 ## RTC
+
 import sys
 import time
 import sqlite3
-'''import SDL_DS3231 ## RTC'''
 
 #dtoverlay=i2c-rtc,ds1307
 #nano /boot/config.txt
@@ -11,7 +14,9 @@ import sqlite3
 
 #sudo i2cdetect -y 1
 
-'''reader = SimpleMFRC522()'''
+default_root = 314206806829
+
+reader = SimpleMFRC522()
 '''ds3231 = SDL_DS3231.SDL_DS3231(1, 0x68)'''
 
 
@@ -43,27 +48,33 @@ def openDoor():
     return False
 
 
-def writeIntoDatabase():
+def writeIntoDatabase(label):
     # check if already exists
     # if exists:
     #   print(error)
     # else:
     # write()
 
-    text = input('New data (please enter your name):')
-    print('Now place your tag to write')
+    #text = input('New data (please enter your name):')
+    label.setText('Now place your tag to write')
 
-    '''reader.write(text)'''
-    cardID, text = 1, "text" '''reader.read()'''
+    cardID, text = reader.read()
+    print(cardID)
+    
+        # if admin
+    if cardID == default_root:
+        label.setText('Place your employee')
+    else:
+        label.setText("U can't authorize others")
+        return
+    
+    time.sleep(2.4)
+    print('Place your employee')
+    cardID, text = reader.read()
     print(text)
 
-    #today = time.localtime()
     now = time.localtime()
     today = time.strftime("%H:%M:%S", now)
-
-    print('cardID = ', cardID)
-    print('text = ', text)
-    print('today = ', today)
 
     cur.execute("insert into Cards values(?, ?, ?)", (cardID, text, today))
     con.commit()
@@ -73,6 +84,8 @@ def writeIntoDatabase():
 class MainWindow(QWidget):
     def __init__(self):
         QMainWindow.__init__(self)
+
+        self.showFullScreen()
 
         app.setStyle('Fusion')
         self.window = QWidget(self)
@@ -92,18 +105,24 @@ class MainWindow(QWidget):
         self.info.setStyleSheet(" font-size: 15px; font-family: Courier New; qproperty-alignment: AlignRight")
         self.info.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.changeLabel)
+
+        #podlaczenie do bazy
+        baza()
+        
         self.initGrid()
         self.setGrid()
         self.counter = 0
 
-        #podłączenie do bazy
-        baza()
 
     def init_TableList(self):
         cur.execute('''SELECT * FROM Cards ''')
         rows = cur.fetchall()
 
-        self.tableList.setEnabled(False)            #wygląda śrendnio, ale działa
+        #self.tableList.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tableList.setEnabled(False)            #wyglada srendnio, ale dziala
+        
         self.tableList.setRowCount(len(rows))
         self.tableList.setColumnCount(3)
         self.tableList.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -123,25 +142,19 @@ class MainWindow(QWidget):
     def keyPressEvent(self, event):
         try:
             if event.key() == Qt.Key_1:
-                writeIntoDatabase()
                 self.info.setText("New data in database")
-                self.timer = QTimer(self)
-                self.timer.setInterval(10000)
-                self.timer.timeout.connect(self.changeLabel)
-                self.timer.start()
+                writeIntoDatabase(self.info)
+                self.timer.singleShot(10000, self.changeLabel)
                 print("Zapisanie do bazy")
 
             elif event.key() == Qt.Key_2:
                 #openDoor()
                 self.info.setText("The door is open")
-                self.timer = QTimer(self)
-                self.timer.setInterval(10000)
-                self.timer.timeout.connect(self.changeLabel)
-                self.timer.start()
+                self.timer.singleShot(10000, self.changeLabel)
                 print("A teraz drzwi")
 
             elif event.key() == Qt.Key_3:
-                '''GPIO.cleanup()'''
+                GPIO.cleanup()
                 self.info.setText("Goodbye")
                 if con:
                     con.close()
@@ -151,21 +164,16 @@ class MainWindow(QWidget):
             elif event.key() == Qt.Key_4:
                 cur.execute("drop table Cards")
                 self.info.setText("Nothing in database")
-                self.timer = QTimer(self)
-                self.timer.setInterval(10000)
-                self.timer.timeout.connect(self.changeLabel)
-                self.timer.start()
+                self.timer.singleShot(10000, self.changeLabel)
                 print("Czyszczenie bazy")
                 baza()      #zeby po wyczyszczeniu istniala dalej tablica
 
             elif event.key() == Qt.Key_5:
                 self.init_TableList()
                 self.info.setText("You see all data")
-                self.timer = QTimer(self)
-                self.timer.setInterval(10000)
-                self.timer.timeout.connect(self.changeLabel)
-                self.timer.start()
+                self.timer.singleShot(10000, self.changeLabel)
                 print("wyswietlam wszystkie")
+
 
             else:
                 print('Wrong output')
@@ -181,8 +189,9 @@ class MainWindow(QWidget):
         self.init_TableList()
 
     def changeLabel(self):
-        self.info.setText("Nothing")
-
+        self.info.setText("Nothing :" + str(self.counter))
+        self.counter += 1
+        
     def setGrid(self):
         self.layout = QVBoxLayout(self)
         self.layout2 = QHBoxLayout(self)
